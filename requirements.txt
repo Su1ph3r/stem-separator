@@ -1,0 +1,8 @@
+# Stem Separator Dependencies
+demucs
+yt-dlp
+soundfile
+scipy
+
+# For RTX 5090 / Blackwell GPU support, also run:
+# pip install --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
