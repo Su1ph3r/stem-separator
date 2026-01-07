@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python -m py_compile:*)",
+      "Bash(python stem_separator.py:*)",
+      "Bash(python:*)"
+    ]
+  }
+}
