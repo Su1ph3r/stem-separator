@@ -1,8 +1,27 @@
 # Stem Separator Dependencies
+
+# Core dependencies
 demucs
 yt-dlp
 soundfile
 scipy
+
+# Progress bar
+tqdm>=4.65.0
+
+# Configuration file support
+pyyaml>=6.0
+
+# BPM and key detection
+librosa>=0.10.0
+
+# Audio normalization
+pyloudnorm>=0.1.0
+
+# API server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
 
 # For RTX 5090 / Blackwell GPU support, also run:
 # pip install --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
