@@ -522,6 +522,147 @@ def get_stem_color(stem_name: str) -> str:
     return colors.get(stem_name.lower(), '#808080')
 
 
+def get_stem_color_rgb(stem_name: str) -> Tuple[int, int, int]:
+    """Get RGB color tuple for a stem track (for Studio One)"""
+    colors = {
+        'vocals': (255, 107, 107),
+        'drums': (78, 205, 196),
+        'bass': (69, 183, 209),
+        'other': (150, 206, 180),
+        'guitar': (255, 234, 167),
+        'piano': (221, 160, 221)
+    }
+    return colors.get(stem_name.lower(), (128, 128, 128))
+
+
+def create_studioone_project(stems_dir: str, output_path: str, sample_rate: int = 44100) -> Optional[str]:
+    """
+    Create a Studio One .song project file for the separated stems.
+
+    Studio One .song files are ZIP archives containing XML metadata
+    and references to audio files.
+    """
+    import zipfile
+    import xml.etree.ElementTree as ET
+    from xml.dom import minidom
+
+    try:
+        project_name = os.path.basename(output_path).replace('.song', '')
+        project_dir = os.path.dirname(output_path) or '.'
+        song_path = os.path.join(project_dir, f"{project_name}.song")
+
+        # Get all audio files in stems directory
+        audio_files = []
+        for ext in ['.wav', '.mp3', '.flac', '.ogg', '.aac']:
+            audio_files.extend(glob_module.glob(os.path.join(stems_dir, f'*{ext}')))
+
+        if not audio_files:
+            print("  Warning: No audio files found for DAW export")
+            return None
+
+        audio_files = sorted(audio_files)
+
+        # Create Song.xml content
+        song_xml = create_studioone_song_xml(project_name, audio_files, sample_rate)
+
+        # Create the .song ZIP archive
+        with zipfile.ZipFile(song_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add Song.xml
+            zf.writestr('Song/Song.xml', song_xml)
+
+            # Add Media Pool references (external file references)
+            media_xml = create_studioone_media_xml(audio_files)
+            zf.writestr('Song/MediaPool.xml', media_xml)
+
+            # Add basic metadata
+            meta_xml = create_studioone_metadata_xml(project_name)
+            zf.writestr('Metadata/Metadata.xml', meta_xml)
+
+        print(f"    Created: {os.path.basename(song_path)}")
+        print(f"    Tip: Open {os.path.basename(song_path)} in Studio One")
+        print(f"    Note: Stems are referenced from: {stems_dir}")
+
+        return song_path
+
+    except Exception as e:
+        print(f"  Warning: Studio One export failed: {e}")
+        return None
+
+
+def create_studioone_song_xml(project_name: str, audio_files: List[str], sample_rate: int) -> str:
+    """Create the Song.xml content for Studio One project"""
+
+    # Build XML structure
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<Song name="{project_name}" sampleRate="{sample_rate}" version="5.0">',
+        '  <Attributes>',
+        f'    <Attribute name="Title" value="{project_name}"/>',
+        '    <Attribute name="TimeSignature" value="4/4"/>',
+        '    <Attribute name="Tempo" value="120"/>',
+        '  </Attributes>',
+        '  <Tracks>',
+    ]
+
+    for i, audio_file in enumerate(audio_files):
+        stem_name = os.path.splitext(os.path.basename(audio_file))[0]
+        r, g, b = get_stem_color_rgb(stem_name)
+        abs_path = os.path.abspath(audio_file)
+
+        lines.extend([
+            f'    <AudioTrack name="{stem_name}" index="{i}" color="#{r:02x}{g:02x}{b:02x}">',
+            f'      <AudioEvent name="{stem_name}" start="0" length="auto">',
+            f'        <AudioFile path="{abs_path}"/>',
+            '      </AudioEvent>',
+            '    </AudioTrack>',
+        ])
+
+    lines.extend([
+        '  </Tracks>',
+        '  <MasterTrack>',
+        '    <Volume value="1.0"/>',
+        '  </MasterTrack>',
+        '</Song>',
+    ])
+
+    return '\n'.join(lines)
+
+
+def create_studioone_media_xml(audio_files: List[str]) -> str:
+    """Create MediaPool.xml for Studio One project"""
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<MediaPool>',
+        '  <AudioFiles>',
+    ]
+
+    for i, audio_file in enumerate(audio_files):
+        abs_path = os.path.abspath(audio_file)
+        filename = os.path.basename(audio_file)
+        lines.append(f'    <AudioFile id="{i}" name="{filename}" path="{abs_path}"/>')
+
+    lines.extend([
+        '  </AudioFiles>',
+        '</MediaPool>',
+    ])
+
+    return '\n'.join(lines)
+
+
+def create_studioone_metadata_xml(project_name: str) -> str:
+    """Create Metadata.xml for Studio One project"""
+
+    return f'''<?xml version="1.0" encoding="UTF-8"?>
+<Metadata>
+  <Title>{project_name}</Title>
+  <Artist>Stem Separator</Artist>
+  <Created>{datetime.now().isoformat()}</Created>
+  <Generator>Stem Separator v2.0</Generator>
+</Metadata>
+'''
+
+
 # =============================================================================
 # UTILITIES
 # =============================================================================
@@ -793,7 +934,10 @@ def separate_audio(input_file, output_dir, model_name='htdemucs', output_format=
     # DAW export
     if export_daw:
         print(f"  Creating DAW project ({export_daw})...")
-        create_audacity_project(stems_dir, os.path.join(output_dir, f"stems_{export_daw}"), sr)
+        if export_daw == 'audacity':
+            create_audacity_project(stems_dir, os.path.join(output_dir, f"stems_{export_daw}"), sr)
+        elif export_daw == 'studioone':
+            create_studioone_project(stems_dir, os.path.join(output_dir, f"stems_{export_daw}"), sr)
 
     return stems_dir, analysis_results
 
@@ -929,7 +1073,7 @@ def main():
     parser.add_argument('--normalize-level', type=float, default=-14.0,
                        help='Target loudness in LUFS (default: -14.0)')
     parser.add_argument('--analyze', action='store_true', help='Analyze BPM and musical key')
-    parser.add_argument('--export-daw', choices=['audacity'],
+    parser.add_argument('--export-daw', choices=['audacity', 'studioone'],
                        help='Export DAW project file')
 
     # Configuration

@@ -111,10 +111,16 @@ python stem_separator.py song.mp3 --normalize --normalize-level -16.0
 # Export with Audacity project files
 python stem_separator.py song.mp3 --export-daw audacity
 
-# Creates:
-# - stems_audacity_project.json  (project metadata)
-# - stems_audacity.lof           (open in Audacity to import all tracks)
+# Export with Studio One project file
+python stem_separator.py song.mp3 --export-daw studioone
 ```
+
+**Audacity** creates:
+- `*.lof` - Open in Audacity → File → Import → Audio
+- `*_project.json` - Project metadata
+
+**Studio One** creates:
+- `*.song` - Native Studio One project file (open directly)
 
 ### Configuration File
 
@@ -181,7 +187,7 @@ curl http://localhost:8000/jobs/abc123/download/vocals.wav -o vocals.wav
 | `--normalize` | Normalize audio loudness |
 | `--normalize-level` | Target LUFS level (default: -14.0) |
 | `--analyze` | Analyze BPM and musical key |
-| `--export-daw` | Export DAW project: `audacity` |
+| `--export-daw` | Export DAW project: `audacity`, `studioone` |
 | `--config` | Load settings from YAML file |
 | `--save-config` | Save current settings to file |
 | `--server` | Start API server mode |
