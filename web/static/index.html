@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stem Separator - AI Audio Separation</title>
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #252525;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --border: #333333;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            background: var(--bg-tertiary);
+            padding: 0.25rem;
+            border-radius: 8px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        input[type="text"],
+        input[type="url"],
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--bg-tertiary);
+        }
+
+        .dropzone:hover,
+        .dropzone.dragover {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .dropzone-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .dropzone-text {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .dropzone-text strong {
+            color: var(--accent);
+        }
+
+        .selected-file {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .jobs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .job-item {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .job-source {
+            font-weight: 500;
+            font-size: 0.95rem;
+            word-break: break-all;
+        }
+
+        .job-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .job-status.pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .job-status.processing {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent);
+        }
+
+        .job-status.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+        }
+
+        .job-status.failed,
+        .job-status.cancelled {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        .progress-container {
+            margin: 0.75rem 0;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #a855f7);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .output-files {
+            margin-top: 1rem;
+        }
+
+        .output-files h4 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .file-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .file-item a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .file-item a:hover {
+            text-decoration: underline;
+        }
+
+        .download-all {
+            margin-top: 0.75rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--bg-tertiary);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            background: var(--success);
+        }
+
+        .toast.error {
+            background: var(--error);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .advanced-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .advanced-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .advanced-options {
+            display: none;
+        }
+
+        .advanced-options.show {
+            display: block;
+        }
+
+        .error-box {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--error);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Stem Separator</h1>
+            <p>AI-powered audio stem separation using Demucs</p>
+        </header>
+
+        <div class="main-grid">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">&#127925;</div>
+                    <h2>Separate Audio</h2>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="upload">Upload File</button>
+                    <button class="tab" data-tab="url">YouTube/Spotify</button>
+                </div>
+
+                <div id="upload-tab" class="tab-content active">
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon">&#128190;</div>
+                        <p class="dropzone-text">
+                            Drag & drop your audio file here<br>
+                            or <strong>click to browse</strong>
+                        </p>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            MP3, WAV, FLAC, OGG, AAC, M4A (max 500MB)
+                        </p>
+                    </div>
+                    <input type="file" id="file-input" accept=".mp3,.wav,.flac,.ogg,.aac,.m4a,.wma,.opus">
+                    <div id="selected-file-display" class="selected-file" style="display: none;">
+                        <span>&#128196;</span>
+                        <span id="selected-filename"></span>
+                    </div>
+                </div>
+
+                <div id="url-tab" class="tab-content">
+                    <div class="form-group">
+                        <label for="url-input">Paste YouTube or Spotify URL</label>
+                        <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=... or https://open.spotify.com/track/...">
+                    </div>
+                    <div class="checkbox-item" style="margin-bottom: 1rem;">
+                        <input type="checkbox" id="playlist-check">
+                        <label for="playlist-check">Process entire playlist</label>
+                    </div>
+                </div>
+
+                <div class="options-grid">
+                    <div class="form-group">
+                        <label for="model-select">Model</label>
+                        <select id="model-select">
+                            <option value="htdemucs">htdemucs (Default)</option>
+                            <option value="htdemucs_ft">htdemucs_ft (Fine-tuned)</option>
+                            <option value="htdemucs_6s">htdemucs_6s (6 stems)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="format-select">Output Format</label>
+                        <select id="format-select">
+                            <option value="wav">WAV (Lossless)</option>
+                            <option value="mp3">MP3 (320kbps)</option>
+                            <option value="flac">FLAC (Lossless)</option>
+                            <option value="ogg">OGG (Vorbis)</option>
+                            <option value="aac">AAC (256kbps)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="stems-select">Stems to Export</label>
+                    <select id="stems-select">
+                        <option value="">All stems</option>
+                        <option value="vocals">Vocals only</option>
+                        <option value="karaoke">Karaoke (no vocals)</option>
+                        <option value="drums">Drums only</option>
+                        <option value="bass">Bass only</option>
+                        <option value="vocals,drums">Vocals + Drums</option>
+                    </select>
+                </div>
+
+                <div class="advanced-toggle" id="advanced-toggle">
+                    <span id="advanced-arrow">&#9654;</span>
+                    <span>Advanced Options</span>
+                </div>
+
+                <div id="advanced-options" class="advanced-options">
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="cpu-check">
+                            <label for="cpu-check">Force CPU mode</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="normalize-check">
+                            <label for="normalize-check">Normalize audio</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="quality-check">
+                            <label for="quality-check">Quality analysis</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="lowmem-check">
+                            <label for="lowmem-check">Low memory mode</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="process-btn" style="margin-top: 1.5rem;">
+                    <span>&#9654;</span> Start Separation
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon">&#128203;</div>
+                    <h2>Jobs</h2>
+                </div>
+
+                <div id="jobs-container" class="jobs-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // State
+        let selectedFile = null;
+        let activeTab = 'upload';
+        let jobs = [];
+        let websockets = {};
+
+        // DOM Elements
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const selectedFileDisplay = document.getElementById('selected-file-display');
+        const selectedFilename = document.getElementById('selected-filename');
+        const urlInput = document.getElementById('url-input');
+        const processBtn = document.getElementById('process-btn');
+        const jobsContainer = document.getElementById('jobs-container');
+        const advancedToggle = document.getElementById('advanced-toggle');
+
+        // Utility: Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Utility: Safe text node creation
+        function createTextNode(text) {
+            return document.createTextNode(text || '');
+        }
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                activeTab = tab.dataset.tab;
+                document.getElementById(activeTab + '-tab').classList.add('active');
+            });
+        });
+
+        // Dropzone
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        function handleFileSelect(file) {
+            const allowedExts = ['.mp3', '.wav', '.flac', '.ogg', '.aac', '.m4a', '.wma', '.opus'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+
+            if (!allowedExts.includes(ext)) {
+                showToast('Invalid file type. Please select an audio file.', 'error');
+                return;
+            }
+
+            if (file.size > 500 * 1024 * 1024) {
+                showToast('File too large. Maximum size is 500MB.', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            selectedFilename.textContent = file.name;
+            selectedFileDisplay.style.display = 'flex';
+        }
+
+        // Advanced options toggle
+        advancedToggle.addEventListener('click', () => {
+            const options = document.getElementById('advanced-options');
+            const arrow = document.getElementById('advanced-arrow');
+            options.classList.toggle('show');
+            arrow.textContent = options.classList.contains('show') ? '\u25BC' : '\u25B6';
+        });
+
+        // Process button
+        processBtn.addEventListener('click', async () => {
+            if (activeTab === 'upload') {
+                if (!selectedFile) {
+                    showToast('Please select a file first.', 'error');
+                    return;
+                }
+                await uploadFile();
+            } else {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    showToast('Please enter a URL.', 'error');
+                    return;
+                }
+                await processUrl(url);
+            }
+        });
+
+        // Upload file
+        async function uploadFile() {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('model', document.getElementById('model-select').value);
+            formData.append('format', document.getElementById('format-select').value);
+
+            const stems = document.getElementById('stems-select').value;
+            if (stems) formData.append('stems', stems);
+
+            formData.append('cpu', document.getElementById('cpu-check').checked);
+            formData.append('normalize', document.getElementById('normalize-check').checked);
+            formData.append('quality', document.getElementById('quality-check').checked);
+            formData.append('low_memory', document.getElementById('lowmem-check').checked);
+
+            processBtn.disabled = true;
+            processBtn.textContent = '';
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            processBtn.appendChild(spinner);
+            processBtn.appendChild(createTextNode(' Uploading...'));
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                const result = await response.json();
+                showToast('Upload successful! Processing started.', 'success');
+                connectToJob(result.job_id);
+
+                selectedFile = null;
+                selectedFileDisplay.style.display = 'none';
+                fileInput.value = '';
+
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                processBtn.disabled = false;
+                processBtn.textContent = '';
+                processBtn.appendChild(createTextNode('\u25B6 Start Separation'));
+            }
+        }
+
+        // Process URL
+        async function processUrl(url) {
+            const formData = new FormData();
+            formData.append('url', url);
+            formData.append('model', document.getElementById('model-select').value);
+            formData.append('format', document.getElementById('format-select').value);
+
+            const stems = document.getElementById('stems-select').value;
+            if (stems) formData.append('stems', stems);
+
+            formData.append('cpu', document.getElementById('cpu-check').checked);
+            formData.append('normalize', document.getElementById('normalize-check').checked);
+            formData.append('quality', document.getElementById('quality-check').checked);
+            formData.append('low_memory', document.getElementById('lowmem-check').checked);
+            formData.append('playlist', document.getElementById('playlist-check').checked);
+
+            processBtn.disabled = true;
+            processBtn.textContent = '';
+            const spinner = document.createElement('div');
+            spinner.className = 'spinner';
+            processBtn.appendChild(spinner);
+            processBtn.appendChild(createTextNode(' Processing...'));
+
+            try {
+                const response = await fetch('/api/url', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Processing failed');
+                }
+
+                const result = await response.json();
+                showToast('Processing started!', 'success');
+                connectToJob(result.job_id);
+                urlInput.value = '';
+
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                processBtn.disabled = false;
+                processBtn.textContent = '\u25B6 Start Separation';
+            }
+        }
+
+        // WebSocket connection for job updates
+        function connectToJob(jobId) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(protocol + '//' + window.location.host + '/ws/jobs/' + jobId);
+
+            websockets[jobId] = ws;
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'job_update') {
+                    updateJob(data.job);
+                }
+            };
+
+            ws.onclose = () => {
+                delete websockets[jobId];
+            };
+        }
+
+        // Update job display
+        function updateJob(job) {
+            const existingIndex = jobs.findIndex(j => j.id === job.id);
+            if (existingIndex >= 0) {
+                jobs[existingIndex] = job;
+            } else {
+                jobs.unshift(job);
+            }
+            renderJobs();
+        }
+
+        // Render jobs list using safe DOM methods
+        function renderJobs() {
+            jobsContainer.textContent = '';
+
+            if (jobs.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+
+                const icon = document.createElement('div');
+                icon.className = 'empty-state-icon';
+                icon.textContent = '\u{1F3B6}';
+                emptyState.appendChild(icon);
+
+                const p1 = document.createElement('p');
+                p1.textContent = 'No jobs yet';
+                emptyState.appendChild(p1);
+
+                const p2 = document.createElement('p');
+                p2.style.fontSize = '0.85rem';
+                p2.textContent = 'Upload a file or paste a URL to get started';
+                emptyState.appendChild(p2);
+
+                jobsContainer.appendChild(emptyState);
+                return;
+            }
+
+            jobs.forEach(job => {
+                const jobItem = document.createElement('div');
+                jobItem.className = 'job-item';
+
+                // Header
+                const header = document.createElement('div');
+                header.className = 'job-header';
+
+                const source = document.createElement('div');
+                source.className = 'job-source';
+                const sourceText = job.source || '';
+                source.textContent = sourceText.length > 50 ? sourceText.substring(0, 50) + '...' : sourceText;
+
+                const status = document.createElement('span');
+                status.className = 'job-status ' + (job.status || '').toLowerCase();
+                let statusIcon = '';
+                switch (job.status) {
+                    case 'pending': statusIcon = '\u23F3 '; break;
+                    case 'processing': statusIcon = '\u2699 '; break;
+                    case 'completed': statusIcon = '\u2714 '; break;
+                    case 'failed': statusIcon = '\u2716 '; break;
+                    case 'cancelled': statusIcon = '\u{1F6D1} '; break;
+                }
+                status.textContent = statusIcon + (job.status || '');
+
+                header.appendChild(source);
+                header.appendChild(status);
+                jobItem.appendChild(header);
+
+                // Progress bar for processing jobs
+                if (job.status === 'processing') {
+                    const progressContainer = document.createElement('div');
+                    progressContainer.className = 'progress-container';
+
+                    const progressBar = document.createElement('div');
+                    progressBar.className = 'progress-bar';
+
+                    const progressFill = document.createElement('div');
+                    progressFill.className = 'progress-fill';
+                    progressFill.style.width = (job.progress || 0) + '%';
+                    progressBar.appendChild(progressFill);
+                    progressContainer.appendChild(progressBar);
+
+                    const progressText = document.createElement('div');
+                    progressText.className = 'progress-text';
+
+                    const msgSpan = document.createElement('span');
+                    msgSpan.textContent = job.message || 'Processing...';
+                    progressText.appendChild(msgSpan);
+
+                    const pctSpan = document.createElement('span');
+                    pctSpan.textContent = (job.progress || 0) + '%';
+                    progressText.appendChild(pctSpan);
+
+                    progressContainer.appendChild(progressText);
+                    jobItem.appendChild(progressContainer);
+                }
+
+                // Output files for completed jobs
+                if (job.status === 'completed' && job.output_files && job.output_files.length > 0) {
+                    const outputFiles = document.createElement('div');
+                    outputFiles.className = 'output-files';
+
+                    const h4 = document.createElement('h4');
+                    h4.textContent = 'Output Files:';
+                    outputFiles.appendChild(h4);
+
+                    const fileList = document.createElement('div');
+                    fileList.className = 'file-list';
+
+                    job.output_files.forEach(f => {
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'file-item';
+
+                        const iconSpan = document.createElement('span');
+                        iconSpan.textContent = '\u{1F3B5}';
+                        fileItem.appendChild(iconSpan);
+
+                        const link = document.createElement('a');
+                        link.href = '/api/download/' + encodeURIComponent(job.id) + '/' + encodeURIComponent(f.path || '');
+                        link.download = f.name || '';
+                        link.textContent = f.name || 'file';
+                        fileItem.appendChild(link);
+
+                        const sizeSpan = document.createElement('span');
+                        sizeSpan.style.color = 'var(--text-secondary)';
+                        sizeSpan.style.fontSize = '0.75rem';
+                        sizeSpan.textContent = ' (' + formatFileSize(f.size || 0) + ')';
+                        fileItem.appendChild(sizeSpan);
+
+                        fileList.appendChild(fileItem);
+                    });
+
+                    outputFiles.appendChild(fileList);
+
+                    const downloadAll = document.createElement('div');
+                    downloadAll.className = 'download-all';
+
+                    const dlLink = document.createElement('a');
+                    dlLink.href = '/api/download-all/' + encodeURIComponent(job.id);
+                    dlLink.className = 'btn btn-success';
+                    dlLink.style.fontSize = '0.85rem';
+                    dlLink.style.padding = '0.5rem 1rem';
+                    dlLink.textContent = '\u{1F4BE} Download All (ZIP)';
+                    downloadAll.appendChild(dlLink);
+
+                    outputFiles.appendChild(downloadAll);
+                    jobItem.appendChild(outputFiles);
+                }
+
+                // Error message for failed jobs
+                if (job.status === 'failed' && job.error) {
+                    const errorBox = document.createElement('div');
+                    errorBox.className = 'error-box';
+                    const errorText = job.error || '';
+                    errorBox.textContent = errorText.length > 200 ? errorText.substring(0, 200) + '...' : errorText;
+                    jobItem.appendChild(errorBox);
+                }
+
+                // Cancel button for processing jobs
+                if (job.status === 'processing') {
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'btn btn-danger';
+                    cancelBtn.style.marginTop = '0.75rem';
+                    cancelBtn.style.fontSize = '0.85rem';
+                    cancelBtn.style.padding = '0.5rem 1rem';
+                    cancelBtn.textContent = 'Cancel';
+                    cancelBtn.addEventListener('click', () => cancelJob(job.id));
+                    jobItem.appendChild(cancelBtn);
+                }
+
+                jobsContainer.appendChild(jobItem);
+            });
+        }
+
+        // Cancel job
+        async function cancelJob(jobId) {
+            try {
+                const response = await fetch('/api/jobs/' + encodeURIComponent(jobId) + '/cancel', { method: 'POST' });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Cancel failed');
+                }
+                showToast('Job cancelled', 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Toast notifications
+        function showToast(message, type) {
+            type = type || 'success';
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        // Utility functions
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Load existing jobs on page load
+        async function loadJobs() {
+            try {
+                const response = await fetch('/api/jobs');
+                const data = await response.json();
+                jobs = data.jobs || [];
+                renderJobs();
+
+                // Connect to WebSocket for any processing jobs
+                jobs.filter(j => j.status === 'processing').forEach(j => {
+                    connectToJob(j.id);
+                });
+            } catch (error) {
+                console.error('Failed to load jobs:', error);
+            }
+        }
+
+        // Initialize
+        loadJobs();
+    </script>
+</body>
+</html>

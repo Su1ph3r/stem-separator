@@ -84,3 +84,10 @@ Thumbs.db
 *.tmp
 *.temp
 temp_*/
+
+# Docker directories
+input/
+output/
+
+# Playwright
+.playwright-mcp/

@@ -71,6 +71,27 @@ This enables:
 - Running as `stem-separator song.mp3` or `stems song.mp3`
 - Running as `python -m stem_separator song.mp3`
 
+### Docker (Recommended for Easy Setup)
+
+Run with Docker for the easiest setup - no dependencies to install:
+
+```bash
+# CPU mode (works on any machine)
+docker compose --profile cpu up -d
+
+# GPU mode (requires NVIDIA GPU + Container Toolkit)
+docker compose --profile gpu up -d
+
+# Access the web UI at http://localhost:8080
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker documentation, including:
+- Building custom images
+- Volume mounting for input/output
+- Model caching
+- CLI usage in Docker
+- API documentation
+
 ## Usage
 
 ### Basic Usage
@@ -300,6 +321,19 @@ pip install torch torchaudio
 | GPU (CUDA) | ~30 seconds |
 | Apple Silicon (MPS) | ~1 minute |
 | CPU | 2-4 minutes |
+
+## Web UI
+
+The Docker container includes a modern web interface at http://localhost:8080 with:
+
+- **File Upload**: Drag & drop audio files (MP3, WAV, FLAC, OGG, AAC, M4A)
+- **URL Processing**: Paste YouTube or Spotify URLs directly
+- **Playlist Support**: Process entire playlists
+- **All CLI Options**: Model selection, output format, stem selection, etc.
+- **Real-time Progress**: Live progress updates via WebSocket
+- **Easy Downloads**: Download individual stems or all as ZIP
+
+![Web UI Screenshot](docs/web-ui.png)
 
 ## API Usage
 

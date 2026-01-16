@@ -1,0 +1,100 @@
+# Stem Separator Docker Compose
+#
+# CPU Mode:
+#   docker compose up stem-separator-cpu
+#
+# GPU Mode (requires NVIDIA Container Toolkit):
+#   docker compose up stem-separator-gpu
+#
+# Or use profiles:
+#   docker compose --profile cpu up
+#   docker compose --profile gpu up
+
+services:
+  # =============================================================================
+  # CPU Version - Works on any machine
+  # =============================================================================
+  stem-separator-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USE_GPU: "false"
+    image: stem-separator:cpu
+    container_name: stem-separator-cpu
+    profiles:
+      - cpu
+    ports:
+      - "8080:8080"
+    volumes:
+      # Input directory - place your audio files here
+      - ./input:/input:ro
+      # Output directory - separated stems will be saved here
+      - ./output:/output
+      # Cache directory - stores downloaded models (persist between runs)
+      - stem-separator-cache:/cache
+      # Optional: Mount config file
+      # - ./config.yaml:/home/stemuser/.stem-separator.yaml:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Force CPU mode
+      - CUDA_VISIBLE_DEVICES=""
+      # CORS: Allow all origins for local development (restrict in production)
+      - CORS_ORIGINS=*
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # =============================================================================
+  # GPU Version - Requires NVIDIA GPU and Container Toolkit
+  # =============================================================================
+  stem-separator-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USE_GPU: "true"
+    image: stem-separator:gpu
+    container_name: stem-separator-gpu
+    profiles:
+      - gpu
+    ports:
+      - "8080:8080"
+    volumes:
+      # Input directory - place your audio files here
+      - ./input:/input:ro
+      # Output directory - separated stems will be saved here
+      - ./output:/output
+      # Cache directory - stores downloaded models (persist between runs)
+      - stem-separator-cache:/cache
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # CORS: Allow all origins for local development (restrict in production)
+      - CORS_ORIGINS=*
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# =============================================================================
+# Named volumes for persistent data
+# =============================================================================
+volumes:
+  stem-separator-cache:
+    name: stem-separator-model-cache

@@ -1,0 +1,92 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+tests/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Documentation (keep README.md for the image)
+CHANGELOG.md
+docs/
+
+# Audio files (don't include in build)
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.aac
+*.m4a
+*.wma
+*.opus
+
+# Output directories
+input/
+output/
+*_stems/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache/
+*.cache
+
+# Local config
+*.local.yaml
+*.local.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
