@@ -1,8 +1,27 @@
 # Stem Separator Dependencies
-demucs
-yt-dlp
-soundfile
-scipy
+# Core dependencies
+demucs>=4.0.0
+yt-dlp>=2023.1.1
+soundfile>=0.12.0
+scipy>=1.9.0
+numpy>=1.21.0
+pyyaml>=6.0
+rich>=13.0.0
 
-# For RTX 5090 / Blackwell GPU support, also run:
+# Optional: Spotify support
+# spotdl>=4.0.0
+
+# Optional: Audio preview
+# sounddevice>=0.4.0
+
+# Optional: Enhanced metadata handling
+# mutagen>=1.45.0
+
+# For GPU support (NVIDIA):
+# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# For RTX 5090 / Blackwell GPU support:
 # pip install --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+
+# For Apple Silicon (M1/M2/M3):
+# pip install torch torchaudio
