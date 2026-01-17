@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from stem_separator.logging_config import get_logger
+from stem_separator.utils import SUBPROCESS_TIMEOUT
 
 
 @dataclass
@@ -145,19 +146,24 @@ def read_metadata(file_path: Path) -> Optional[AudioMetadata]:
             logger.debug("Mutagen not available, falling back to ffprobe")
 
         # Fallback to ffprobe
-        result = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "quiet",
-                "-print_format",
-                "json",
-                "-show_format",
-                str(file_path),
-            ],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=60,  # 1 minute timeout for metadata read
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout reading metadata from: {file_path}")
+            return None
 
         if result.returncode != 0:
             return None
@@ -181,7 +187,7 @@ def read_metadata(file_path: Path) -> Optional[AudioMetadata]:
         )
 
     except Exception as e:
-        logger.debug(f"Failed to read metadata: {e}")
+        logger.warning(f"Failed to read metadata from {file_path}: {e}")
         return None
 
 
@@ -258,7 +264,12 @@ def write_metadata(
         cmd.extend(metadata.to_ffmpeg_args(stem_name))
         cmd.append(str(temp_path))
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            temp_path.unlink(missing_ok=True)
+            logger.warning(f"Timeout writing metadata to: {file_path}")
+            return False
 
         if result.returncode == 0:
             temp_path.replace(file_path)
@@ -269,7 +280,7 @@ def write_metadata(
             return False
 
     except Exception as e:
-        logger.debug(f"Failed to write metadata: {e}")
+        logger.warning(f"Failed to write metadata to {file_path}: {e}")
         return False
 
 
@@ -310,21 +321,26 @@ def extract_cover_art(file_path: Path, output_path: Path) -> bool:
 
     try:
         # Try using ffmpeg
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-i",
-                str(file_path),
-                "-an",  # No audio
-                "-vcodec",
-                "copy",
-                "-y",
-                "-loglevel",
-                "error",
-                str(output_path),
-            ],
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-i",
+                    str(file_path),
+                    "-an",  # No audio
+                    "-vcodec",
+                    "copy",
+                    "-y",
+                    "-loglevel",
+                    "error",
+                    str(output_path),
+                ],
+                capture_output=True,
+                timeout=60,  # 1 minute timeout for cover art
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Timeout extracting cover art from: {file_path}")
+            return False
 
         if result.returncode == 0 and output_path.exists():
             return True
@@ -336,7 +352,7 @@ def extract_cover_art(file_path: Path, output_path: Path) -> bool:
             return True
 
     except Exception as e:
-        logger.debug(f"Failed to extract cover art: {e}")
+        logger.warning(f"Failed to extract cover art from {file_path}: {e}")
 
     return False
 
@@ -360,28 +376,34 @@ def embed_cover_art(audio_path: Path, image_path: Path) -> bool:
     try:
         temp_path = audio_path.with_suffix(f".temp{audio_path.suffix}")
 
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-i",
-                str(audio_path),
-                "-i",
-                str(image_path),
-                "-map",
-                "0:a",
-                "-map",
-                "1:v",
-                "-c",
-                "copy",
-                "-disposition:v:0",
-                "attached_pic",
-                "-y",
-                "-loglevel",
-                "error",
-                str(temp_path),
-            ],
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-i",
+                    str(audio_path),
+                    "-i",
+                    str(image_path),
+                    "-map",
+                    "0:a",
+                    "-map",
+                    "1:v",
+                    "-c",
+                    "copy",
+                    "-disposition:v:0",
+                    "attached_pic",
+                    "-y",
+                    "-loglevel",
+                    "error",
+                    str(temp_path),
+                ],
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            temp_path.unlink(missing_ok=True)
+            logger.warning(f"Timeout embedding cover art into: {audio_path}")
+            return False
 
         if result.returncode == 0:
             temp_path.replace(audio_path)
@@ -390,6 +412,6 @@ def embed_cover_art(audio_path: Path, image_path: Path) -> bool:
             temp_path.unlink(missing_ok=True)
 
     except Exception as e:
-        logger.debug(f"Failed to embed cover art: {e}")
+        logger.warning(f"Failed to embed cover art into {audio_path}: {e}")
 
     return False

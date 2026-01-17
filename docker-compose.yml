@@ -39,8 +39,9 @@ services:
       - PYTHONUNBUFFERED=1
       # Force CPU mode
       - CUDA_VISIBLE_DEVICES=""
-      # CORS: Allow all origins for local development (restrict in production)
-      - CORS_ORIGINS=*
+      # CORS: Empty for same-origin only (most secure)
+      # Set CORS_ORIGINS=http://localhost:8080 or specific origins if needed
+      - CORS_ORIGINS=
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -75,8 +76,9 @@ services:
       - PYTHONUNBUFFERED=1
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      # CORS: Allow all origins for local development (restrict in production)
-      - CORS_ORIGINS=*
+      # CORS: Empty for same-origin only (most secure)
+      # Set CORS_ORIGINS=http://localhost:8080 or specific origins if needed
+      - CORS_ORIGINS=
     deploy:
       resources:
         reservations:

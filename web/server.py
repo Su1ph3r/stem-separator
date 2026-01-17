@@ -13,13 +13,14 @@ shell injection attacks.
 import argparse
 import asyncio
 import json
+import logging
 import os
 import re
 import secrets
 import shutil
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -70,8 +71,21 @@ else:
 # Maximum jobs to return in list
 MAX_JOBS_LIMIT = 100
 
-# Job ID validation pattern (alphanumeric only)
-JOB_ID_PATTERN = re.compile(r"^[a-f0-9]{8}$")
+# Job ID validation pattern (alphanumeric, 22 chars for secrets.token_urlsafe(16))
+JOB_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{16,24}$")
+
+# Job cleanup settings
+JOB_EXPIRY_HOURS = int(os.environ.get("JOB_EXPIRY_HOURS", 24))  # Hours before jobs are cleaned up
+MAX_JOBS_IN_MEMORY = int(os.environ.get("MAX_JOBS_IN_MEMORY", 1000))  # Maximum jobs to keep in memory
+
+# Processing timeout (1 hour default)
+PROCESSING_TIMEOUT = int(os.environ.get("PROCESSING_TIMEOUT", 3600))
+
+# WebSocket connection limits
+MAX_WEBSOCKET_CONNECTIONS_PER_JOB = 10
+
+# Logger for this module
+logger = logging.getLogger(__name__)
 
 # Allowed audio extensions
 ALLOWED_EXTENSIONS = {".mp3", ".wav", ".flac", ".ogg", ".aac", ".m4a", ".wma", ".opus"}
@@ -89,6 +103,37 @@ class JobStatus:
     CANCELLED = "cancelled"
 
 
+def sanitize_error_message(error_msg: str, max_length: int = 500) -> str:
+    """
+    Sanitize error messages to prevent information disclosure.
+
+    Args:
+        error_msg: The raw error message.
+        max_length: Maximum length of the returned message.
+
+    Returns:
+        Sanitized error message safe to return to clients.
+    """
+    if not error_msg:
+        return "Unknown error"
+
+    # Remove absolute paths (Unix and Windows style)
+    sanitized = re.sub(r'/[a-zA-Z0-9/_.\-]+', '[PATH]', error_msg)
+    sanitized = re.sub(r'[A-Z]:\\[a-zA-Z0-9\\_.\-]+', '[PATH]', sanitized)
+
+    # Remove IP addresses
+    sanitized = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[IP]', sanitized)
+
+    # Remove potential credentials/tokens
+    sanitized = re.sub(r'(password|token|key|secret|auth)[=:]\S+', r'\1=[REDACTED]', sanitized, flags=re.IGNORECASE)
+
+    # Truncate to max length
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+
+    return sanitized
+
+
 class JobManager:
     """Manages separation jobs and their status."""
 
@@ -96,10 +141,16 @@ class JobManager:
         self.jobs: dict = {}
         self.active_processes: dict = {}
         self.websockets: dict[str, list[WebSocket]] = {}
+        self._last_cleanup = datetime.now()
 
     def create_job(self, source_type: str, source: str, options: dict) -> str:
         """Create a new job and return its ID."""
-        job_id = str(uuid.uuid4())[:8]
+        # Use cryptographically secure ID (22 chars from 16 bytes)
+        job_id = secrets.token_urlsafe(16)
+
+        # Cleanup old jobs periodically
+        self._maybe_cleanup()
+
         self.jobs[job_id] = {
             "id": job_id,
             "status": JobStatus.PENDING,
@@ -162,6 +213,70 @@ class JobManager:
         """Unsubscribe from job updates."""
         if job_id in self.websockets and websocket in self.websockets[job_id]:
             self.websockets[job_id].remove(websocket)
+
+    def _maybe_cleanup(self):
+        """Periodically clean up old jobs to prevent memory leaks."""
+        now = datetime.now()
+
+        # Only run cleanup every 10 minutes at most
+        if (now - self._last_cleanup).total_seconds() < 600:
+            return
+
+        self._last_cleanup = now
+        self._cleanup_old_jobs()
+
+    def _cleanup_old_jobs(self):
+        """Remove expired jobs and enforce memory limits."""
+        now = datetime.now()
+        expiry_threshold = now - timedelta(hours=JOB_EXPIRY_HOURS)
+
+        # Find jobs to remove
+        jobs_to_remove = []
+        for job_id, job in self.jobs.items():
+            # Skip active jobs
+            if job["status"] == JobStatus.PROCESSING:
+                continue
+
+            # Remove expired jobs
+            try:
+                created_at = datetime.fromisoformat(job["created_at"])
+                if created_at < expiry_threshold:
+                    jobs_to_remove.append(job_id)
+            except (ValueError, KeyError):
+                # Invalid date, mark for removal
+                jobs_to_remove.append(job_id)
+
+        # Remove expired jobs
+        for job_id in jobs_to_remove:
+            self._remove_job(job_id)
+
+        # If still over limit, remove oldest completed jobs
+        if len(self.jobs) > MAX_JOBS_IN_MEMORY:
+            completed_jobs = [
+                (job_id, job) for job_id, job in self.jobs.items()
+                if job["status"] in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
+            ]
+            # Sort by created_at, oldest first
+            completed_jobs.sort(key=lambda x: x[1].get("created_at", ""))
+
+            # Remove oldest jobs until under limit
+            excess = len(self.jobs) - MAX_JOBS_IN_MEMORY
+            for job_id, _ in completed_jobs[:excess]:
+                self._remove_job(job_id)
+
+        if jobs_to_remove:
+            logger.info(f"Cleaned up {len(jobs_to_remove)} expired jobs")
+
+    def _remove_job(self, job_id: str):
+        """Remove a job and its associated resources."""
+        if job_id in self.jobs:
+            del self.jobs[job_id]
+        if job_id in self.websockets:
+            del self.websockets[job_id]
+
+    def get_websocket_count(self, job_id: str) -> int:
+        """Get the number of WebSocket connections for a job."""
+        return len(self.websockets.get(job_id, []))
 
 
 # Global job manager
@@ -277,6 +392,7 @@ async def run_separation(job_id: str, input_path: str, options: dict):
         progress=5,
     )
 
+    process = None
     try:
         output_dir = str(OUTPUT_DIR / job_id)
         cmd = build_separation_command(input_path, output_dir, options)
@@ -296,9 +412,20 @@ async def run_separation(job_id: str, input_path: str, options: dict):
 
         job_manager.active_processes[job_id] = process
 
-        # Monitor progress
+        # Monitor progress with timeout
         progress = 10
+        start_time = datetime.now()
         while process.returncode is None:
+            # Check for timeout
+            elapsed = (datetime.now() - start_time).total_seconds()
+            if elapsed > PROCESSING_TIMEOUT:
+                logger.warning(f"Job {job_id} exceeded timeout of {PROCESSING_TIMEOUT}s, terminating")
+                process.terminate()
+                await asyncio.sleep(1)
+                if process.returncode is None:
+                    process.kill()
+                raise asyncio.TimeoutError(f"Processing timeout exceeded ({PROCESSING_TIMEOUT}s)")
+
             if progress < 90:
                 progress += 5
                 job_manager.update_job(job_id, progress=progress)
@@ -340,23 +467,34 @@ async def run_separation(job_id: str, input_path: str, options: dict):
                 status=JobStatus.FAILED,
                 completed_at=datetime.now().isoformat(),
                 message="Separation failed",
-                error=error_msg,
+                error=sanitize_error_message(error_msg),
             )
 
     except asyncio.CancelledError:
+        if process and process.returncode is None:
+            process.terminate()
         job_manager.update_job(
             job_id,
             status=JobStatus.CANCELLED,
             completed_at=datetime.now().isoformat(),
             message="Job cancelled",
         )
+    except asyncio.TimeoutError as e:
+        job_manager.update_job(
+            job_id,
+            status=JobStatus.FAILED,
+            completed_at=datetime.now().isoformat(),
+            message="Processing timeout",
+            error=sanitize_error_message(str(e)),
+        )
     except Exception as e:
+        logger.exception(f"Separation failed for job {job_id}")
         job_manager.update_job(
             job_id,
             status=JobStatus.FAILED,
             completed_at=datetime.now().isoformat(),
             message="Separation failed",
-            error=str(e),
+            error=sanitize_error_message(str(e)),
         )
     finally:
         if job_id in job_manager.active_processes:
@@ -373,6 +511,7 @@ async def run_url_separation(job_id: str, url: str, options: dict):
         progress=5,
     )
 
+    process = None
     try:
         output_dir = str(OUTPUT_DIR / job_id)
         cmd = build_separation_command(url, output_dir, options)
@@ -386,9 +525,20 @@ async def run_url_separation(job_id: str, url: str, options: dict):
 
         job_manager.active_processes[job_id] = process
 
-        # Monitor progress
+        # Monitor progress with timeout
         progress = 5
+        start_time = datetime.now()
         while process.returncode is None:
+            # Check for timeout
+            elapsed = (datetime.now() - start_time).total_seconds()
+            if elapsed > PROCESSING_TIMEOUT:
+                logger.warning(f"Job {job_id} exceeded timeout of {PROCESSING_TIMEOUT}s, terminating")
+                process.terminate()
+                await asyncio.sleep(1)
+                if process.returncode is None:
+                    process.kill()
+                raise asyncio.TimeoutError(f"Processing timeout exceeded ({PROCESSING_TIMEOUT}s)")
+
             if progress < 90:
                 progress += 3
                 msg = "Processing..." if progress > 30 else "Downloading..."
@@ -429,23 +579,34 @@ async def run_url_separation(job_id: str, url: str, options: dict):
                 status=JobStatus.FAILED,
                 completed_at=datetime.now().isoformat(),
                 message="Processing failed",
-                error=error_msg,
+                error=sanitize_error_message(error_msg),
             )
 
     except asyncio.CancelledError:
+        if process and process.returncode is None:
+            process.terminate()
         job_manager.update_job(
             job_id,
             status=JobStatus.CANCELLED,
             completed_at=datetime.now().isoformat(),
             message="Job cancelled",
         )
+    except asyncio.TimeoutError as e:
+        job_manager.update_job(
+            job_id,
+            status=JobStatus.FAILED,
+            completed_at=datetime.now().isoformat(),
+            message="Processing timeout",
+            error=sanitize_error_message(str(e)),
+        )
     except Exception as e:
+        logger.exception(f"URL separation failed for job {job_id}")
         job_manager.update_job(
             job_id,
             status=JobStatus.FAILED,
             completed_at=datetime.now().isoformat(),
             message="Processing failed",
-            error=str(e),
+            error=sanitize_error_message(str(e)),
         )
     finally:
         if job_id in job_manager.active_processes:
@@ -496,21 +657,35 @@ async def upload_file(
             detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # Check file size
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size: {MAX_UPLOAD_SIZE // (1024*1024)}MB"
-        )
-
-    # Save uploaded file
+    # Save uploaded file with streaming to avoid loading entire file into memory
     safe_name = secure_filename(file.filename)
     file_id = generate_file_id()
     upload_path = UPLOAD_DIR / f"{file_id}_{safe_name}"
 
-    async with aiofiles.open(upload_path, "wb") as f:
-        await f.write(content)
+    # Stream file and check size during upload
+    total_size = 0
+    chunk_size = 1024 * 1024  # 1MB chunks
+
+    try:
+        async with aiofiles.open(upload_path, "wb") as f:
+            while chunk := await file.read(chunk_size):
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    # Clean up partial file
+                    await f.close()
+                    upload_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size: {MAX_UPLOAD_SIZE // (1024*1024)}MB"
+                    )
+                await f.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Clean up on error
+        upload_path.unlink(missing_ok=True)
+        logger.exception("File upload failed")
+        raise HTTPException(status_code=500, detail="File upload failed")
 
     # Create job
     options = {
@@ -635,7 +810,13 @@ async def download_file(job_id: str, filename: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Build file path
+    # Security: sanitize filename FIRST to prevent path traversal
+    # Remove any path components and traversal sequences
+    filename = os.path.basename(filename)
+    if not filename or ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Build file path with sanitized filename
     file_path = OUTPUT_DIR / job_id / filename
 
     # Security: ensure path is within output directory (prevent traversal)
@@ -693,6 +874,11 @@ async def websocket_job_updates(websocket: WebSocket, job_id: str):
     # Validate job_id format before accepting connection
     if not validate_job_id(job_id):
         await websocket.close(code=4000, reason="Invalid job ID format")
+        return
+
+    # Check connection limit before accepting
+    if job_manager.get_websocket_count(job_id) >= MAX_WEBSOCKET_CONNECTIONS_PER_JOB:
+        await websocket.close(code=4003, reason="Too many connections for this job")
         return
 
     await websocket.accept()

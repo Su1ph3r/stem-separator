@@ -97,12 +97,15 @@ class YouTubeDownloader:
 
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, errors="replace"
+                cmd, capture_output=True, text=True, errors="replace",
+                timeout=SUBPROCESS_TIMEOUT
             )
             if result.returncode == 0:
                 return json.loads(result.stdout)
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"Timeout fetching video info for: {url}")
         except (subprocess.SubprocessError, json.JSONDecodeError) as e:
-            self.logger.debug(f"Failed to get video info: {e}")
+            self.logger.warning(f"Failed to get video info: {e}")
         return None
 
     def get_playlist_info(self, url: str) -> list[YouTubeTrack]:
@@ -216,8 +219,18 @@ class YouTubeDownloader:
 
         cmd.append(url)
 
-        # Run download
-        result = subprocess.run(cmd, stderr=subprocess.PIPE, text=True, errors="replace")
+        # Run download with timeout
+        try:
+            result = subprocess.run(
+                cmd, stderr=subprocess.PIPE, text=True, errors="replace",
+                timeout=SUBPROCESS_TIMEOUT
+            )
+        except subprocess.TimeoutExpired:
+            return DownloadResult(
+                success=False,
+                title=title,
+                error=f"Download timeout exceeded ({SUBPROCESS_TIMEOUT}s)",
+            )
 
         if result.returncode != 0:
             error_msg = result.stderr or "Unknown error"
@@ -233,12 +246,21 @@ class YouTubeDownloader:
         for file in self.output_dir.iterdir():
             if file.name.startswith("temp_download"):
                 self.logger.debug(f"Converting {file} to WAV...")
-                convert_result = subprocess.run(
-                    ["ffmpeg", "-i", str(file), "-y", "-loglevel", "error", str(output_file)],
-                    capture_output=True,
-                    text=True,
-                    errors="replace",
-                )
+                try:
+                    convert_result = subprocess.run(
+                        ["ffmpeg", "-i", str(file), "-y", "-loglevel", "error", str(output_file)],
+                        capture_output=True,
+                        text=True,
+                        errors="replace",
+                        timeout=SUBPROCESS_TIMEOUT,
+                    )
+                except subprocess.TimeoutExpired:
+                    file.unlink(missing_ok=True)
+                    return DownloadResult(
+                        success=False,
+                        title=title,
+                        error="Audio conversion timeout exceeded",
+                    )
                 file.unlink()  # Remove temp file
 
                 if convert_result.returncode == 0 and output_file.exists():

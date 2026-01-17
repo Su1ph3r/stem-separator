@@ -204,7 +204,17 @@ def load_user_config(config_path: Optional[Path] = None) -> UserConfig:
             parallel_jobs=data.get("parallel_jobs", 1),
             low_memory=data.get("low_memory", False),
         )
-    except (yaml.YAMLError, OSError):
+    except yaml.YAMLError as e:
+        # Log the YAML parsing error so users know their config has issues
+        import sys
+        print(f"Warning: Failed to parse config file {config_path}: {e}", file=sys.stderr)
+        print("Using default configuration.", file=sys.stderr)
+        return UserConfig()
+    except OSError as e:
+        # Log file read errors
+        import sys
+        print(f"Warning: Could not read config file {config_path}: {e}", file=sys.stderr)
+        print("Using default configuration.", file=sys.stderr)
         return UserConfig()
 
 

@@ -287,16 +287,33 @@ class BatchProcessor:
         on_item_complete: Optional[Callable[[BatchItem, SeparationResult], None]] = None,
     ) -> BatchResult:
         """
-        Process items in parallel.
+        Process items with parallel_jobs > 1.
 
-        Note: True parallelism for GPU processing is limited.
-        This is more useful for CPU processing on multi-core systems.
+        IMPORTANT NOTE: Due to GPU memory constraints and model loading overhead,
+        this method currently processes items sequentially even when parallel_jobs > 1.
+        True parallel processing would require:
+        - Multiple GPU contexts (for GPU mode) - not practical due to VRAM limits
+        - Multiple model instances (for CPU mode) - high memory overhead (~4GB per instance)
+
+        For users seeking parallelism:
+        - Use --parallel flag mainly for I/O-bound pre/post processing
+        - For true parallel GPU processing, run multiple separate instances
+        - Consider batch mode with model pre-loading for efficiency instead
+
+        The parallel_jobs parameter may be used in future versions for:
+        - Pre-processing file conversions
+        - Post-processing format conversions
+        - Multi-GPU setups
         """
         batch_result = BatchResult(total=len(items))
 
-        # For GPU, we use threading (shares GPU context)
-        # For CPU, we could use multiprocessing but model loading overhead is high
-        # So we use threading with sequential model access
+        # Log info about parallel processing limitation
+        if self.parallel_jobs > 1 and not self.force_cpu:
+            self.logger.info(
+                f"Note: parallel_jobs={self.parallel_jobs} requested, but GPU processing "
+                "uses sequential execution to avoid VRAM exhaustion. "
+                "Model pre-loading still provides efficiency benefits."
+            )
 
         with create_progress("Processing") as progress:
             task = progress.add_task("Files", total=len(items))

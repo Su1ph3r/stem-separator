@@ -87,6 +87,7 @@ class SpotifyDownloader:
                 capture_output=True,
                 text=True,
                 errors="replace",
+                timeout=SUBPROCESS_TIMEOUT,
             )
 
             if result.returncode == 0 and result.stdout.strip():
@@ -107,8 +108,10 @@ class SpotifyDownloader:
 
                 return SpotifyTrack(url=url, title=title, artist=artist)
 
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"Timeout fetching track info for: {url}")
         except subprocess.SubprocessError as e:
-            self.logger.debug(f"Failed to get track info: {e}")
+            self.logger.warning(f"Failed to get track info: {e}")
 
         return None
 
@@ -132,6 +135,7 @@ class SpotifyDownloader:
                 text=True,
                 errors="replace",
                 cwd=str(self.output_dir),
+                timeout=SUBPROCESS_TIMEOUT,
             )
 
             # Parse the output to get track list
@@ -152,8 +156,10 @@ class SpotifyDownloader:
                                 )
                             )
 
+        except subprocess.TimeoutExpired:
+            self.logger.warning(f"Timeout fetching playlist tracks for: {url}")
         except subprocess.SubprocessError as e:
-            self.logger.error(f"Failed to get playlist tracks: {e}")
+            self.logger.warning(f"Failed to get playlist tracks: {e}")
 
         # Update totals
         for track in tracks:
@@ -219,6 +225,7 @@ class SpotifyDownloader:
                 text=True,
                 errors="replace",
                 cwd=str(self.output_dir),
+                timeout=SUBPROCESS_TIMEOUT,
             )
 
             if result.returncode != 0:
@@ -237,6 +244,7 @@ class SpotifyDownloader:
                     text=True,
                     errors="replace",
                     cwd=str(self.output_dir),
+                    timeout=SUBPROCESS_TIMEOUT,
                 )
 
                 if result.returncode == 0:
@@ -246,18 +254,28 @@ class SpotifyDownloader:
                             filename_prefix or artist
                         ):
                             wav_file = file.with_suffix(".wav")
-                            convert_result = subprocess.run(
-                                [
-                                    "ffmpeg",
-                                    "-i",
-                                    str(file),
-                                    "-y",
-                                    "-loglevel",
-                                    "error",
-                                    str(wav_file),
-                                ],
-                                capture_output=True,
-                            )
+                            try:
+                                convert_result = subprocess.run(
+                                    [
+                                        "ffmpeg",
+                                        "-i",
+                                        str(file),
+                                        "-y",
+                                        "-loglevel",
+                                        "error",
+                                        str(wav_file),
+                                    ],
+                                    capture_output=True,
+                                    timeout=SUBPROCESS_TIMEOUT,
+                                )
+                            except subprocess.TimeoutExpired:
+                                file.unlink(missing_ok=True)
+                                return SpotifyDownloadResult(
+                                    success=False,
+                                    title=title,
+                                    artist=artist,
+                                    error="Audio conversion timeout exceeded",
+                                )
                             if convert_result.returncode == 0:
                                 file.unlink()  # Remove mp3
                                 return SpotifyDownloadResult(
@@ -292,6 +310,13 @@ class SpotifyDownloader:
                 error="Downloaded file not found",
             )
 
+        except subprocess.TimeoutExpired:
+            return SpotifyDownloadResult(
+                success=False,
+                title=title,
+                artist=artist,
+                error=f"Download timeout exceeded ({SUBPROCESS_TIMEOUT}s)",
+            )
         except subprocess.SubprocessError as e:
             return SpotifyDownloadResult(
                 success=False,
@@ -348,6 +373,7 @@ class SpotifyDownloader:
                 text=True,
                 errors="replace",
                 cwd=str(self.output_dir),
+                timeout=SUBPROCESS_TIMEOUT,
             )
 
             # Find all downloaded files
@@ -382,18 +408,29 @@ class SpotifyDownloader:
                         title = name
 
                     # Convert to WAV
-                    convert_result = subprocess.run(
-                        [
-                            "ffmpeg",
-                            "-i",
-                            str(mp3_file),
-                            "-y",
-                            "-loglevel",
-                            "error",
-                            str(wav_file),
-                        ],
-                        capture_output=True,
-                    )
+                    try:
+                        convert_result = subprocess.run(
+                            [
+                                "ffmpeg",
+                                "-i",
+                                str(mp3_file),
+                                "-y",
+                                "-loglevel",
+                                "error",
+                                str(wav_file),
+                            ],
+                            capture_output=True,
+                            timeout=SUBPROCESS_TIMEOUT,
+                        )
+                    except subprocess.TimeoutExpired:
+                        yield SpotifyDownloadResult(
+                            success=False,
+                            title=title,
+                            artist=artist,
+                            error="WAV conversion timeout exceeded",
+                        )
+                        progress.advance(task)
+                        continue
 
                     if convert_result.returncode == 0 and wav_file.exists():
                         mp3_file.unlink()
@@ -413,6 +450,11 @@ class SpotifyDownloader:
 
                     progress.advance(task)
 
+        except subprocess.TimeoutExpired:
+            yield SpotifyDownloadResult(
+                success=False,
+                error=f"Playlist download timeout exceeded ({SUBPROCESS_TIMEOUT}s)",
+            )
         except subprocess.SubprocessError as e:
             yield SpotifyDownloadResult(success=False, error=str(e))
 

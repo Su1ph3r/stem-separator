@@ -54,6 +54,7 @@ pytest_cache/
 # Environments
 .env
 .venv
+.build-venv/
 env/
 venv/
 ENV/
