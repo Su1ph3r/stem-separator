@@ -74,10 +74,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/stem-separator/stem-separator-cli"
-Documentation = "https://github.com/stem-separator/stem-separator-cli#readme"
-Repository = "https://github.com/stem-separator/stem-separator-cli"
-Issues = "https://github.com/stem-separator/stem-separator-cli/issues"
+Homepage = "https://github.com/Su1ph3r/stem-separator"
+Documentation = "https://github.com/Su1ph3r/stem-separator#readme"
+Repository = "https://github.com/Su1ph3r/stem-separator"
+Issues = "https://github.com/Su1ph3r/stem-separator/issues"
 
 [project.scripts]
 stem-separator = "stem_separator.cli:main"
