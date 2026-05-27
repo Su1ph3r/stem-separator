@@ -4,8 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [2.0.0] - 2025-01-16
 
+> **Published to PyPI 2026-05-27** via OIDC trusted publishing.
+> Install with `pip install stem-separator`.
+
 ### Added
-- **Modular Package Architecture**: Refactored into installable Python package (`pip install -e .`)
+- **Modular Package Architecture**: Refactored into installable Python package — install via `pip install stem-separator` (PyPI) or `pip install -e .` (from a clone for development)
 - **Batch Processing**: Process entire directories with `--batch` flag
 - **YouTube Playlist Support**: Download and process entire playlists with `--playlist`
 - **Spotify Support**: Download and process Spotify tracks and playlists (requires spotdl)

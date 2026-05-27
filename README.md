@@ -18,7 +18,39 @@ Separates audio into vocals, drums, bass, and other instruments using [Demucs](h
 
 ## Installation
 
-### Quick Install
+### From PyPI (recommended)
+
+```bash
+pip install stem-separator
+```
+
+That pulls the package and all required Python dependencies (Demucs,
+yt-dlp, soundfile, scipy, pyyaml, rich) in one step. After install you
+can invoke the tool as `stem-separator`, `stems`, or `python -m stem_separator`.
+
+FFmpeg is still required separately — it isn't a pip package:
+
+```bash
+# Windows
+winget install FFmpeg.FFmpeg
+# macOS
+brew install ffmpeg
+# Linux (Debian/Ubuntu)
+sudo apt install ffmpeg
+```
+
+Optional extras (install only what you need):
+
+```bash
+pip install spotdl        # Spotify support
+pip install sounddevice   # audio preview
+pip install mutagen       # enhanced metadata handling
+```
+
+### Quick install scripts (alternative)
+
+If you'd rather not manage Python environments by hand, the bundled
+scripts set up a venv and install everything for you.
 
 **Windows:**
 ```batch
@@ -30,46 +62,16 @@ install.bat
 chmod +x install.sh && ./install.sh
 ```
 
-### Manual Install
-
-1. **Install FFmpeg** (required):
-   ```bash
-   # Windows
-   winget install FFmpeg.FFmpeg
-
-   # macOS
-   brew install ffmpeg
-
-   # Linux (Debian/Ubuntu)
-   sudo apt install ffmpeg
-   ```
-
-2. **Install Python packages**:
-   ```bash
-   pip install demucs yt-dlp soundfile scipy pyyaml rich
-   ```
-
-3. **Optional dependencies**:
-   ```bash
-   # Spotify support
-   pip install spotdl
-
-   # Audio preview
-   pip install sounddevice
-
-   # Enhanced metadata handling
-   pip install mutagen
-   ```
-
-### Install as Package (Recommended)
+### From source (contributors)
 
 ```bash
+git clone https://github.com/<owner>/stem-separator-cli.git
+cd stem-separator-cli/stem-separator
 pip install -e .
 ```
 
-This enables:
-- Running as `stem-separator song.mp3` or `stems song.mp3`
-- Running as `python -m stem_separator song.mp3`
+The editable install enables the same `stem-separator` / `stems` /
+`python -m stem_separator` entry points as the PyPI install.
 
 ### Docker (Recommended for Easy Setup)
 
